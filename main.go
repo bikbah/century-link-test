@@ -9,24 +9,6 @@ import (
 	"github.com/emicklei/go-restful/swagger"
 )
 
-// This example show a complete (GET,PUT,POST,DELETE) conventional example of
-// a REST Resource including documentation to be served by e.g. a Swagger UI
-// It is recommended to create a Resource struct (UserResource) that can encapsulate
-// an object that provide domain access (a DAO)
-// It has a Register method including the complete Route mapping to methods together
-// with all the appropriate documentation
-//
-// POST http://localhost:8080/users
-// <User><Id>1</Id><Name>Melissa Raspberry</Name></User>
-//
-// GET http://localhost:8080/users/1
-//
-// PUT http://localhost:8080/users/1
-// <User><Id>1</Id><Name>Melissa</Name></User>
-//
-// DELETE http://localhost:8080/users/1
-//
-
 type User struct {
 	Id, Name string
 }
