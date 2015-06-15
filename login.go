@@ -3,9 +3,11 @@ package main
 import (
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/x509"
+	"encoding/base64"
 	"errors"
+	"io/ioutil"
 	"log"
-	"math/big"
 	"net/http"
 	"time"
 
@@ -26,7 +28,7 @@ func RegisterServices(container *restful.Container) {
 		Consumes(restful.MIME_JSON)
 
 	ws.Route(ws.POST("").To(login).
-		Reads(LoginData{})) // from the request
+		Reads(LoginData{}))
 
 	wsSecret := new(restful.WebService)
 	wsSecret.Route(wsSecret.GET("/secret").Filter(authFilter).To(secretHandler))
@@ -43,31 +45,42 @@ func login(request *restful.Request, response *restful.Response) {
 		return
 	}
 
-	if loginData.Password == "secret" {
-
-		rsaKey, err := rsa.GenerateKey(rand.Reader, 512)
-		if err != nil {
-			log.Printf("Generating RSA key error: %v\n", err)
-			return
-		}
-
-		token := jwt.New(jwt.SigningMethodRS256)
-		token.Header["kid"] = rsaKey.PublicKey
-		token.Claims["exp"] = time.Now().Add(time.Hour * 1).Unix()
-
-		tokenString, err := token.SignedString(rsaKey)
-		if err != nil {
-			log.Printf("Token signing error: %v\n", err)
-			response.AddHeader("Content-Type", "text/plain")
-			response.WriteErrorString(http.StatusInternalServerError, err.Error())
-			return
-		}
-
-		response.AddHeader("Authorization", "Access token: "+tokenString)
-		response.Write([]byte("see token in headers.."))
-	} else {
+	if loginData.Password != "secret" {
 		response.AddHeader("Content-Type", "text/plain")
-		response.WriteErrorString(http.StatusUnauthorized, "Authorization fail.")
+		response.WriteErrorString(http.StatusUnauthorized, "Invalid login or password..")
+		return
+	}
+
+	rsaKey, err := rsa.GenerateKey(rand.Reader, 512)
+	if err != nil {
+		log.Printf("Generating RSA key error: %v\n", err)
+		return
+	}
+
+	pubKeyBytes, err := x509.MarshalPKIXPublicKey(&rsaKey.PublicKey)
+	if err != nil {
+		log.Printf("Getting PublicKey bytes error: %v\n", err)
+		return
+	}
+
+	token := jwt.New(jwt.SigningMethodRS256)
+	token.Header["kid"] = base64.StdEncoding.EncodeToString(pubKeyBytes)
+	token.Claims["exp"] = time.Now().Add(time.Minute * 1).Unix()
+
+	tokenString, err := token.SignedString(rsaKey)
+	if err != nil {
+		log.Printf("Token signing error: %v\n", err)
+		response.AddHeader("Content-Type", "text/plain")
+		response.WriteErrorString(http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	resBody := `{"access_token":"` + tokenString + `"}`
+	response.Write([]byte(resBody))
+
+	if err := ioutil.WriteFile("token", []byte(tokenString), 0644); err != nil {
+		log.Printf("Write token file error: %v\n", err)
+		return
 	}
 }
 
@@ -82,39 +95,24 @@ func authFilter(request *restful.Request, response *restful.Response, chain *res
 			return nil, errors.New("No key in kid")
 		}
 
-		key, ok := keyIface.(map[string]interface{})
+		keyStr, ok := keyIface.(string)
 		if !ok {
-			return nil, errors.New("Type assetion error")
+			return nil, errors.New("interface{} to string assertion error..")
 		}
 
-		keyN, ok := key["N"]
-		if !ok {
-			return nil, errors.New("no N")
-		}
-		keyE, ok := key["E"]
-		if !ok {
-			return nil, errors.New("no E")
+		keyBytes, err := base64.StdEncoding.DecodeString(keyStr)
+		if err != nil {
+			return nil, errors.New("Decode base64 string to []bytes error..")
 		}
 
-		N, ok := keyN.(*big.Int)
-		if !ok {
-			log.Println(keyN)
-			return nil, errors.New("type N assert error")
-		}
-		E, ok := keyE.(int)
-		if !ok {
-			return nil, errors.New("type E assert error")
-		}
-
-		return rsa.PublicKey{N: N, E: E}, nil
+		return x509.ParsePKIXPublicKey(keyBytes)
 	})
 
-	if err == nil && token.Valid {
-		log.Println("Token is valid")
-	} else {
+	if !(err == nil && token.Valid) {
 		log.Println("Token parse error: ", err)
-		response.WriteError(http.StatusInternalServerError, errors.New("Auth error"))
+		response.WriteError(http.StatusInternalServerError, errors.New("Auth fail.."))
 		return
 	}
+
 	chain.ProcessFilter(request, response)
 }
