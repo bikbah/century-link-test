@@ -6,9 +6,11 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"path"
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
@@ -30,16 +32,19 @@ func RegisterServices(container *restful.Container) {
 	ws.Route(ws.POST("").To(login).
 		Reads(LoginData{}))
 
-	wsSecret := new(restful.WebService)
-	wsSecret.Route(wsSecret.GET("/secret").Filter(authFilter).To(secretHandler))
+	wsOthers := new(restful.WebService)
+	wsOthers.Route(wsOthers.GET("/secret").Filter(authFilter).To(secretHandler))
+	wsOthers.Route(wsOthers.GET("/public").To(publicHandler))
+	wsOthers.Route(wsOthers.GET("/static/{subpath:*}").To(staticHandler))
 
 	container.Add(ws)
-	container.Add(wsSecret)
+	container.Add(wsOthers)
 }
 
 func login(request *restful.Request, response *restful.Response) {
 	loginData := new(LoginData)
 	if err := request.ReadEntity(loginData); err != nil {
+		log.Printf("Read LoginData entity error: %v\n", err)
 		response.AddHeader("Content-Type", "text/plain")
 		response.WriteErrorString(http.StatusInternalServerError, err.Error())
 		return
@@ -65,7 +70,7 @@ func login(request *restful.Request, response *restful.Response) {
 
 	token := jwt.New(jwt.SigningMethodRS256)
 	token.Header["kid"] = base64.StdEncoding.EncodeToString(pubKeyBytes)
-	token.Claims["exp"] = time.Now().Add(time.Minute * 1).Unix()
+	token.Claims["exp"] = time.Now().Add(time.Minute * 5).Unix()
 
 	tokenString, err := token.SignedString(rsaKey)
 	if err != nil {
@@ -86,6 +91,10 @@ func login(request *restful.Request, response *restful.Response) {
 
 func secretHandler(request *restful.Request, response *restful.Response) {
 	response.Write([]byte("Secret data is here"))
+}
+
+func publicHandler(request *restful.Request, response *restful.Response) {
+	response.Write([]byte("Public data is here. Everyone can see this."))
 }
 
 func authFilter(request *restful.Request, response *restful.Response, chain *restful.FilterChain) {
@@ -115,4 +124,15 @@ func authFilter(request *restful.Request, response *restful.Response, chain *res
 	}
 
 	chain.ProcessFilter(request, response)
+}
+
+func staticHandler(req *restful.Request, resp *restful.Response) {
+	rootdir := "static"
+
+	actual := path.Join(rootdir, req.PathParameter("subpath"))
+	fmt.Printf("serving %s ... (from %s)\n", actual, req.PathParameter("subpath"))
+	http.ServeFile(
+		resp.ResponseWriter,
+		req.Request,
+		actual)
 }
