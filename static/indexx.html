@@ -3,13 +3,58 @@
 <head>
     <meta charset="UTF-8">
     <title>Century Link Test</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css">
     <script src="//code.jquery.com/jquery-1.11.3.min.js"></script>
 </head>
 
 <body>
-    <button id="auth">Authorize (get token)</button>
-    <button id="secret">See secret data</button>
-
+    <div class="auth-form-container" style="width:25%;margin:50px auto;">
+        <form class="form-horizontal">
+            <div class="form-group">
+                <label for="inpLogin" class="col-sm-2 control-label">Login</label>
+                <div class="col-sm-10">
+                    <input type="text" class="form-control" id="inpLogin" placeholder="Login">
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="inpPassword" class="col-sm-2 control-label">Password</label>
+                <div class="col-sm-10">
+                    <input type="password" class="form-control" id="inpPassword" placeholder="Password">
+                </div>
+            </div>
+            <div class="form-group">
+                <div class="col-sm-offset-2 col-sm-10">
+                    <button id="btnSignIn" type="submit" class="btn btn-default">Sign in</button>
+                </div>
+            </div>
+        </form>
+    </div>
+    <hr>
+    <div id="tokenText" style="width:25%;margin:0 auto;">
+        <h4>Access token:</h4>
+        <p style="width:100%;word-wrap:break-word;"></p>
+    </div>
+    <hr>
+    <div style="width:50%;margin:0 auto;">
+        <form class="form-horizontal">
+            <div class="form-group">
+                <label for="inpToken" class="col-sm-2 control-label">Token</label>
+                <div class="col-sm-10">
+                    <input type="text" class="form-control" id="inpToken" placeholder="Paste your token here..">
+                </div>
+            </div>
+            <div class="form-group">
+                <div class="col-sm-offset-2 col-sm-10">
+                    <button id="btnSecretHandler" type="submit" class="btn btn-default">See secret handler</button>
+                </div>
+            </div>
+        </form>
+    </div>
+    <hr>
+    <div id="secretHandlerResponse" style="width:50%;margin:0 auto;">
+        <h4>Secret handler response:</h4>
+        <p></p>
+    </div>
     <script src="main.js"></script>
 </body>
 

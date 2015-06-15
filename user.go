@@ -90,3 +90,15 @@ func createUser(request *restful.Request, response *restful.Response) {
 	response.WriteHeader(http.StatusCreated)
 	response.WriteEntity(usr)
 }
+
+func getUser(login string) (User, bool) {
+
+	usr := User{Login: login}
+
+	if err := DbSession.Query(`SELECT id, password FROM users WHERE login = ? LIMIT 1`,
+		usr.Login).Consistency(gocql.One).Scan(&usr.Id, &usr.Password); err != nil {
+		return usr, false
+	}
+
+	return usr, true
+}

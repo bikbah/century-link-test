@@ -7,21 +7,28 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"path"
 	"time"
 
+	"golang.org/x/crypto/bcrypt"
+
 	"github.com/dgrijalva/jwt-go"
 	"github.com/emicklei/go-restful"
 )
 
+// LoginData is simple struct used when Signing In
 type LoginData struct {
 	Login    string `json:"login"`
 	Password string `json:"password"`
 }
 
+// RegisterServices adds to container WebServices for several routes:
+// 1. /login used to sign in and get token
+// 2. /public is open for everyone
+// 3. /secret is filtered by authFilter. It is open only to authenticated users
+// 4. /static is used to show indexx.html. See staticHandler comments.
 func RegisterServices(container *restful.Container) {
 	ws := new(restful.WebService)
 	ws.
@@ -41,6 +48,8 @@ func RegisterServices(container *restful.Container) {
 	container.Add(wsOthers)
 }
 
+// login handler checks if Login/Password are valid
+// and returns access token if everything is ok
 func login(request *restful.Request, response *restful.Response) {
 	loginData := new(LoginData)
 	if err := request.ReadEntity(loginData); err != nil {
@@ -50,7 +59,21 @@ func login(request *restful.Request, response *restful.Response) {
 		return
 	}
 
-	if loginData.Password != "secret" {
+	usr, ok := getUser(loginData.Login)
+	if !ok {
+		response.AddHeader("Content-Type", "text/plain")
+		response.WriteErrorString(http.StatusInternalServerError, "No user found")
+		return
+	}
+
+	hashedPassword, err := base64.StdEncoding.DecodeString(usr.Password)
+	if err != nil {
+		response.AddHeader("Content-Type", "text/plain")
+		response.WriteErrorString(http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	if err := bcrypt.CompareHashAndPassword(hashedPassword, []byte(loginData.Password)); err != nil {
 		response.AddHeader("Content-Type", "text/plain")
 		response.WriteErrorString(http.StatusUnauthorized, "Invalid login or password..")
 		return
@@ -58,13 +81,15 @@ func login(request *restful.Request, response *restful.Response) {
 
 	rsaKey, err := rsa.GenerateKey(rand.Reader, 512)
 	if err != nil {
-		log.Printf("Generating RSA key error: %v\n", err)
+		response.AddHeader("Content-Type", "text/plain")
+		response.WriteErrorString(http.StatusInternalServerError, err.Error())
 		return
 	}
 
 	pubKeyBytes, err := x509.MarshalPKIXPublicKey(&rsaKey.PublicKey)
 	if err != nil {
-		log.Printf("Getting PublicKey bytes error: %v\n", err)
+		response.AddHeader("Content-Type", "text/plain")
+		response.WriteErrorString(http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -83,20 +108,24 @@ func login(request *restful.Request, response *restful.Response) {
 	resBody := `{"access_token":"` + tokenString + `"}`
 	response.Write([]byte(resBody))
 
-	if err := ioutil.WriteFile("token", []byte(tokenString), 0644); err != nil {
-		log.Printf("Write token file error: %v\n", err)
-		return
-	}
+	// if err := ioutil.WriteFile("token", []byte(tokenString), 0644); err != nil {
+	// 	log.Printf("Write token file error: %v\n", err)
+	// 	return
+	// }
 }
 
+// secretHandler is protected by authFilter.
 func secretHandler(request *restful.Request, response *restful.Response) {
 	response.Write([]byte("Secret data is here"))
 }
 
+// publicHandler is not protected. Everyone can acces this.
 func publicHandler(request *restful.Request, response *restful.Response) {
 	response.Write([]byte("Public data is here. Everyone can see this."))
 }
 
+// authFilter gets raw token from request header ("Authorization": "Bearer ..."),
+// parses it. If token exists and valid, gives access to next handler.
 func authFilter(request *restful.Request, response *restful.Response, chain *restful.FilterChain) {
 	token, err := jwt.ParseFromRequest(request.Request, func(token *jwt.Token) (interface{}, error) {
 		keyIface, ok := token.Header["kid"]
@@ -126,6 +155,12 @@ func authFilter(request *restful.Request, response *restful.Response, chain *res
 	chain.ProcessFilter(request, response)
 }
 
+// staticHandler serves static files from ./static direstory.
+// 1. Open http://localhost:8080/static/indexx.html in your browser.
+// 2. Enter your Login/Password pair and click "Sign In"
+// 3. Copy access token and paste into Token field.
+// 4. Press "See secret handler"
+// 5. You will see secret handler response body
 func staticHandler(req *restful.Request, resp *restful.Response) {
 	rootdir := "static"
 

@@ -1,31 +1,44 @@
 (function() {
   $(document).ready(function() {
-    console.log("JS loaded..");
 
-    $('#auth').click(function() {
+    $('#tokenText').hide();
+    $('#secretHandlerResponse').hide();
+
+    $('#btnSignIn').click(function(e) {
+      e.preventDefault();
       loginData = {
-        login: "bah",
-        password: "secret"
+        login: $('#inpLogin').val(),
+        password: $('#inpPassword').val()
       }
       $.ajax({
         method: "POST",
         url: "http://localhost:8080/login",
         dataType: "json",
-        data: JSON.stringify({"login": "bah", "password": "secret"}),
+        data: JSON.stringify(loginData),
         contentType: "application/json",
-        success: function(data){ console.log(data); }
+        success: function(data) {
+          $('#tokenText').show();
+          console.log(data);
+          $('#tokenText p').text(data["access_token"]);
+        }
       });
     });
 
-    $('#secret').click(function() {
+    $('#btnSecretHandler').click(function(e) {
+      e.preventDefault();
+      token = $('#inpToken').val();
+
       $.ajax({
         method: "GET",
         url: "http://localhost:8080/secret",
         headers: {
-          "Authorization": "Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6Ik1Gd3dEUVlKS29aSWh2Y05BUUVCQlFBRFN3QXdTQUpCQUxiUnU5YXAxTmhsTHhxc0sremJuVUlqQXNRU010RllKdEZHTjVMclgrTCtvVWtsYjNUaUdUYS9rbWdGVE5IdVJCS052MERFbitpQ1duV1UyeXlhRkhjQ0F3RUFBUT09IiwidHlwIjoiSldUIn0.eyJleHAiOjE0MzQzNTc0OTd9.qYYg8a5OyiIC_oJq5q7zTco4h6npjnANg_jkUaH1i3I6dIoQgkN6mYE5V6ajBTGefskYUp6_bCxLdxUq3K_tag"
+          "Authorization": "Bearer " + token
+        },
+        success: function(data) {
+          $('#secretHandlerResponse').show();
+          console.log(data);
+          $('#secretHandlerResponse p').text(data);
         }
-      }).done(function(msg) {
-        console.log(msg);
       });
     });
 
