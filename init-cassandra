@@ -1,3 +1,4 @@
+drop keyspace centurylink;
 create keyspace centurylink with replication = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 };
-create table centurylink.users(dkey text, id UUID, login text, password text PRIMARY KEY(dkey, id));
+create table centurylink.users( dkey text, id UUID, login text, password text, PRIMARY KEY ( dkey, id ));
 create index on centurylink.users(login);
