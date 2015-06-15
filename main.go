@@ -113,6 +113,7 @@ func main() {
 	//restful.TraceLogger(log.New(os.Stdout, "[restful] ", log.LstdFlags|log.Lshortfile))
 
 	wsContainer := restful.NewContainer()
+	wsContainer.Router(restful.CurlyRouter{})
 	u := UserResource{map[string]User{}}
 	u.Register(wsContainer)
 	RegisterServices(wsContainer)
